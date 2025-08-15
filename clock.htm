@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Delius+Swash+Caps&display=swap"
+      rel="stylesheet"
+    />
+    <title>WebPart - 現在時刻</title>
+
+    <!-- jQuery -->
+    <script
+      src="https://code.jquery.com/jquery-3.7.1.min.js"
+      integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="
+      crossorigin="anonymous"
+    ></script>
+
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto,
+          "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+        background: rgba(247, 247, 248, 1); /* 半透明背景 */
+        color: #222;
+      }
+      .wp-clock {
+        /* コンテナサイズを中身にフィットさせる */
+        width: fit-content;
+        /* 旧ブラウザ向けの軽いフォールバックは不要だが、必要ならベンダー接頭辞を追加可能 */
+        /* -webkit-width: fit-content; */
+        /* -moz-width: fit-content; */
+        /* 余白を最小限に */
+        padding: 8px 12px;
+        /* 固定の最大幅は撤去 */
+        /* max-width: 480px; */
+        margin: 8px auto; /* 余白を最小限にしつつ中央寄せ */
+        background: #fcfcf8;
+        border: 1px solid #e6e6e6;
+        border-radius: 12px;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+        text-align: center;
+        --clock-size: 56px; /* 時計サイズの基準 */
+        perspective: 800px; /* 3D回転の見え方を付与 */
+      }
+      /* 1段目（LIVE）と2段目（日付）を同一行に配置 */
+      .wp-top-row {
+        display: flex;
+        align-items: center; /* 上寄せ -> 中央揃え */
+        justify-content: space-between; /* 左：日付 / 右：LIVE */
+        gap: 12px;
+        margin-bottom: 4px; /* 1段目と2段目の間隔 */
+      }
+      .wp-live {
+        font-family: "Delius Swash Caps", cursive;
+        font-weight: 700;
+        font-size: calc(var(--clock-size) / 3); /* 1段目: 時計の1/3 */
+        letter-spacing: 0.08em;
+        color: #fff;
+        background: #e53935; /* 赤背景 */
+        display: inline-block;
+        padding: 0.2em 0.6em;
+        border-radius: 9999px; /* 角丸チップ */
+        line-height: 1;
+        transform-origin: center;
+        transform-style: preserve-3d;
+        backface-visibility: visible;
+        animation: live-spin 4s linear infinite; /* 横回転エフェクト */
+      }
+      @keyframes live-spin {
+        0% {
+          transform: rotateY(0deg);
+        }
+        90% {
+          transform: rotateY(0deg);
+        }
+        100% {
+          transform: rotateY(360deg);
+        }
+      }
+      .wp-date {
+        font-family: "Delius Swash Caps", cursive;
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: "tnum";
+        font-weight: 700;
+        font-size: calc(var(--clock-size) / 2); /* 2段目: 時計の1/2 */
+        letter-spacing: 0.04em;
+      }
+      /* 2段目と3段目の間に表示する AM/PM 行 */
+      .wp-ampm {
+        font-family: "Delius Swash Caps", cursive;
+        font-weight: 700;
+        font-size: calc(var(--clock-size) / 3);
+        letter-spacing: 0.08em;
+        margin-right: 0.2ch; /* 右側の余白を調整 */
+        /* チップ化 */
+        color: #fff;
+        background: #000;
+        display: inline-block;
+        padding: 0.2em 0.6em;
+        border-radius: 9999px;
+        line-height: 1;
+        transform: translateY(-0.5em); /* 時計と同列時にわずかに上げる */
+      }
+      .wp-time {
+        font-family: "Delius Swash Caps", cursive;
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: "tnum"; /* 等幅数字を有効化（対応フォントがある場合のみ有効） */
+        font-weight: 700;
+        font-size: var(--clock-size);
+        line-height: 1.1;
+        letter-spacing: 0.04em;
+      }
+      /* 数字と区切りを等幅セルベースで制御 */
+      .wp-time .cell {
+        display: inline-block;
+        width: 1ch;
+        text-align: center;
+        letter-spacing: 0;
+      }
+      /* 見かけの幅を約0.9chにする（左右に-0.05chずつ） */
+      .wp-time .digit {
+        margin: 0 -0.05ch;
+      }
+      /* 見かけの幅を約0.4chにする（左右に-0.3chずつ） */
+      .wp-time .colon {
+        margin: 0 -0.3ch; /* 約0.4chの見かけ幅に調整 */
+      }
+      .wp-time .group {
+        white-space: nowrap;
+      }
+      /* Smaller seconds and the preceding colon (~60% of main size) */
+      .wp-time .cell.sec {
+        font-size: 0.6em;
+      }
+      /* AM/PM と時計を同一行で下揃え */
+      .wp-time-row {
+        display: flex;
+        align-items: flex-end; /* 下部を合わせる */
+        justify-content: center;
+        gap: 0; /* AM/PM と時計の余白をなくす */
+        flex-wrap: nowrap;
+        margin-top: 4px; /* 上の行との間隔を調整 */
+      }
+      /* 3:2 画像用スペース（薄い水色の背景） */
+      .wp-media-slot {
+        width: 100%;
+        aspect-ratio: 3 / 2;
+        background: #00ff00; /* 薄い水色 */
+        border-radius: 8px;
+        position: relative; /* 絶対配置の基準にする */
+        overflow: show; /* 子要素がはみ出さないように */
+      }
+      /* エフェクト用オーバーレイ */
+      .wp-media-effect1,
+      .wp-media-effect2 {
+        position: absolute;
+        font-size: calc(var(--clock-size) / 1);
+        line-height: 1;
+        pointer-events: none;
+        transform-origin: center;
+        z-index: 1; /* オーバーレイを最前面に */
+      }
+      .wp-media-effect1 {
+        top: -8px;
+        right: 8px;
+        animation: media-bob1 6.1s ease-in-out infinite;
+      }
+      .wp-media-effect2 {
+        bottom: 0px;
+        left: 8px;
+        animation: media-bob2 5.9s ease-in-out infinite;
+        animation-delay: -250ms;
+      }
+      .wp-media-effect1::before {
+        content: "🍉";
+        display: block;
+      }
+      .wp-media-effect2::before {
+        content: "🎐";
+        display: block;
+      }
+      /* Add white outline to overlay icons (emoji) */
+      .wp-media-effect1::before,
+      .wp-media-effect2::before {
+        /* Stroke for WebKit/Blink */
+        -webkit-text-stroke: 3px #fff;
+        /* Fallback/extra outline using multi-directional shadows */
+        text-shadow: 0 0 3px #fff, /* 1px ring */ 1px 0 0 #fff, -1px 0 0 #fff,
+          0 1px 0 #fff, 0 -1px 0 #fff, 1px 1px 0 #fff, -1px 1px 0 #fff,
+          1px -1px 0 #fff, -1px -1px 0 #fff,
+          /* 2px ring to widen by ~1px */ 2px 0 0 #fff, -2px 0 0 #fff,
+          0 2px 0 #fff, 0 -2px 0 #fff, 2px 2px 0 #fff, -2px 2px 0 #fff,
+          2px -2px 0 #fff, -2px -2px 0 #fff;
+      }
+      @keyframes media-bob1 {
+        0%,
+        100% {
+          transform: translateX(0px) translateY(0) rotate(-10deg);
+        }
+        50% {
+          transform: translateX(40px) translateY(10px) rotate(10deg);
+        }
+      }
+      @keyframes media-bob2 {
+        0%,
+        100% {
+          transform: translateX(0px) translateY(0) rotate(10deg);
+        }
+        50% {
+          transform: translateX(-40px) translateY(-10px) rotate(-10deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- WebPart: 現在時刻 -->
+    <section id="clock-webpart" class="wp-clock">
+      <div class="wp-top-row">
+        <div id="date" class="wp-date" aria-live="polite">----/--/--</div>
+        <div class="wp-live">LIVE</div>
+      </div>
+      <!-- 画像用スペース（3:2） -->
+      <div class="wp-media-slot" aria-hidden="true">
+        <div
+          class="wp-media-slot-inner"
+          style="width: 100%; height: 100%; border-radius: 8px"
+        >
+          <img
+            src="data:image/jpeg;base64,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"
+            alt="Placeholder Image"
+            style="width: 100%; height: 100%; object-fit: cover"
+          />
+        </div>
+        <div class="wp-media-effect1" aria-hidden="true"></div>
+        <div class="wp-media-effect2" aria-hidden="true"></div>
+      </div>
+      <!-- 3段目：AM/PM + 時計（横並び） -->
+      <div class="wp-time-row">
+        <div id="ampm" class="wp-ampm" aria-live="polite">am</div>
+        <div id="clock" class="wp-time" role="timer" aria-live="polite">
+          --:--:--
+        </div>
+      </div>
+    </section>
+
+    <script>
+      // jQueryで現在時刻を1秒ごとに更新 + 日付更新
+      $(function () {
+        const $clock = $("#clock");
+        const $date = $("#date");
+        const $ampm = $("#ampm");
+        const dtf = new Intl.DateTimeFormat("en-US", {
+          hour: "2-digit", // 先頭ゼロで幅を固定
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: true,
+        });
+
+        function updateClock() {
+          const now = new Date();
+          const parts = dtf.formatToParts(now);
+          const get = (t) => parts.find((p) => p.type === t)?.value || "";
+          const day = (
+            parts.find((p) => p.type === "dayPeriod")?.value || ""
+          ).toLowerCase();
+          const hour = get("hour");
+          const minute = get("minute");
+          const second = get("second");
+
+          const makeDigitCells = (str, extra = "") =>
+            str
+              .split("")
+              .map(
+                (ch) =>
+                  `<span class="cell digit${
+                    extra ? " " + extra : ""
+                  }">${ch}</span>`
+              )
+              .join("");
+          const makeColon = (extra = "") =>
+            `<span class="cell colon${extra ? " " + extra : ""}">:</span>`;
+
+          const html =
+            `<span class="group">` +
+            makeDigitCells(hour) +
+            makeColon() +
+            makeDigitCells(minute) +
+            makeColon("sec") +
+            makeDigitCells(second, "sec") +
+            `</span>`;
+          $ampm.text(day);
+          $clock.html(html);
+        }
+
+        function updateDate() {
+          const now = new Date();
+          const dateStr = now.toLocaleDateString("ja-JP", {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+          });
+          $date.text(dateStr);
+        }
+
+        // 初回表示
+        updateClock();
+        updateDate();
+
+        // 秒境界に合わせて以降は毎秒更新（ドリフト低減）
+        const msToNextSecond = 1000 - (Date.now() % 1000);
+        setTimeout(function tick() {
+          updateClock();
+          setTimeout(tick, 1000);
+        }, msToNextSecond);
+
+        // 次の0:00に合わせて以降は毎日更新
+        (function scheduleDate() {
+          const now = new Date();
+          const next = new Date(now);
+          next.setHours(24, 0, 0, 0);
+          setTimeout(function () {
+            updateDate();
+            scheduleDate();
+          }, next - now);
+        })();
+      });
+    </script>
+  </body>
+</html>
